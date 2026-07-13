@@ -26,5 +26,9 @@ jobs:
         run: ruff check src tests
       - name: Black --check
         run: black --check src tests
-      - name: Pytest
-        run: pytest
+      - name: Smoke tests (push)
+        if: github.event_name == 'push'
+        run: pytest -m smoke -q
+      - name: Full tests (push on main, or any PR)
+        if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
+        run: pytest -q
