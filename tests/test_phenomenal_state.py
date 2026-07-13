@@ -6,7 +6,6 @@ import torch
 
 from qualia.model.phenomenal_state import PAYLOAD_KEYS, PhenomenalState
 
-
 PERCEPT_DIM = 16
 WORKSPACE_DIM = 8
 SELF_MODEL_DIM = 8

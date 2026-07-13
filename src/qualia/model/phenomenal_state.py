@@ -27,7 +27,6 @@ from typing import Any
 import torch
 from torch import Tensor, nn
 
-
 PAYLOAD_KEYS: tuple[str, ...] = ("arousal", "valence", "content", "agency", "confidence")
 
 
@@ -44,7 +43,10 @@ class PhenomenalStateRecord:
         return {
             "workspace": list(self.workspace),
             "self_model": list(self.self_model),
-            "payload": {k: list(v) if isinstance(v, (list, tuple)) else float(v) for k, v in self.payload.items()},
+            "payload": {
+                k: list(v) if isinstance(v, (list, tuple)) else float(v)
+                for k, v in self.payload.items()
+            },
             "step": int(self.step),
         }
 
@@ -174,7 +176,10 @@ class PhenomenalState(nn.Module):
         return {
             "workspace": h_w,
             "self_model": h_s,
-            "payload": {key: self.payload_projs[key](torch.cat([h_w, h_s], dim=-1)) for key in self.payload_keys},
+            "payload": {
+                key: self.payload_projs[key](torch.cat([h_w, h_s], dim=-1))
+                for key in self.payload_keys
+            },
         }
 
     def introspect(self) -> dict[str, Any]:
