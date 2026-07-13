@@ -86,6 +86,7 @@ class Run(AbstractContextManager["Run"]):
     ) -> None:
         super().__init__()
         self.cfg = cfg
+        self._closed = False
         self.log_every = max(1, int(log_every))
         self.save_every = int(save_every) if save_every is not None and save_every > 0 else None
 

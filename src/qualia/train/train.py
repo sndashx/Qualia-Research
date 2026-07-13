@@ -468,7 +468,6 @@ def main(cfg: DictConfig) -> dict[str, Any]:
 
     with Run(cfg, log_every=int(tc.log_every)) as run:
         run_dir = run.run_dir
-        os.makedirs(run_dir, exist_ok=True)
 
         resolved = OmegaConf.to_container(cfg, resolve=True)
         with open(os.path.join(run_dir, "config.yaml"), "w", encoding="utf-8") as fh:

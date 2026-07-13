@@ -113,7 +113,6 @@ def main(cfg: DictConfig) -> dict[str, Any]:
                 print(f"[qualia.eval.run_eval] FAIL: {failure}")
             raise SystemExit(1)
 
-        os.makedirs(run_dir, exist_ok=True)
         summary_path = os.path.join(run_dir, "eval_metrics.json")
         with open(summary_path, "w", encoding="utf-8") as fh:
             json.dump({"metrics": metrics, "elapsed_s": elapsed_s}, fh, indent=2)
