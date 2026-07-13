@@ -1,4 +1,4 @@
-# Automation — Productivity Boost Follow-up Convey
+# Automation — Productivity Boost Follow-up Convoy
 
 **Author:** Birch (polecat)
 **Bead:** `329c288d-3548-4768-acb5-55fa444ba2a9` ("Automation: pre-stage follow-up improvement beads based on AUDIT.md")
@@ -74,7 +74,7 @@ Together: converts the repo from "scaffold with three modules" to "runnable base
 
 ---
 
-## 5. Convey spec (for `gt_sling_batch --staged`)
+## 5. Convoy spec (for `gt_sling_batch --staged`)
 
 Invocation:
 
