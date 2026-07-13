@@ -50,10 +50,10 @@ class PayloadFusion(nn.Module):
             self.payload_vocabs.setdefault(key, 1)
 
         self.embeddings = nn.ModuleDict(
-            {key: nn.Linear(vocab, hidden_dim) for key, vocab in self.payload_vocabs.items()}
+            {key: nn.Linear(vocab, hidden_dim) for key, vocab in self.payload_vocabs.items() if vocab > 1}
         )
         self.cont_embeds = nn.ModuleDict(
-            {key: nn.Linear(1, hidden_dim) for key in self.payload_keys}
+            {key: nn.Linear(1, hidden_dim) for key, vocab in self.payload_vocabs.items() if vocab == 1}
         )
         self.fuse = nn.Sequential(
             nn.Linear(sensory_dim + len(self.payload_keys) * hidden_dim, hidden_dim),
@@ -70,7 +70,7 @@ class PayloadFusion(nn.Module):
             slot = payload[key]
             if slot.dim() == 1:
                 slot = slot.unsqueeze(0)
-            if slot.shape[-1] == 1:
+            if self.payload_vocabs[key] == 1:
                 feats.append(self.cont_embeds[key](slot))
             else:
                 probs = slot.softmax(dim=-1)
@@ -155,22 +155,45 @@ class _ViTGenerator(nn.Module):
 
 
 class _AudioGenerator(nn.Module):
-    """1D transposed-conv decoder for the audio modality."""
+    """1D transposed-conv decoder for the audio modality.
 
-    def __init__(self, cond_dim: int, out_channels: int = 1, upsample: int = 16) -> None:
+    The decoder is built to upsample from a single sample up to ``upsample``
+    samples by stacking ``ConvTranspose1d`` blocks (stride 4, 8, 16, ...) until
+    the target length is reached. ``forward`` then interpolates to the exact
+    target length so the reconstruction matches the input waveform's temporal
+    length.
+    """
+
+    def __init__(self, cond_dim: int, out_channels: int = 1, upsample: int = 1024) -> None:
         super().__init__()
+        self.upsample = int(upsample)
         self.proj = nn.Linear(cond_dim, 64)
-        self.body = nn.Sequential(
-            nn.GELU(),
-            nn.ConvTranspose1d(64, 32, kernel_size=8, stride=4, padding=2),
-            nn.GELU(),
-            nn.ConvTranspose1d(32, out_channels, kernel_size=8, stride=4, padding=2),
-        )
-        self.upsample = upsample
+
+        layers: list[nn.Module] = [nn.GELU()]
+        cur = 64
+        # Stack ConvTranspose1d layers with stride 4 each until we cover
+        # ``upsample`` (each layer multiplies length by ~4).
+        target = max(self.upsample, 1)
+        while target > 1:
+            next_cur = max(cur // 2, out_channels)
+            layers.append(
+                nn.ConvTranspose1d(cur, next_cur, kernel_size=8, stride=4, padding=2)
+            )
+            cur = next_cur
+            target = (target + 3) // 4  # ceil(target / 4)
+            if cur == out_channels:
+                break
+            layers.append(nn.GELU())
+        if cur != out_channels:
+            layers.append(nn.Conv1d(cur, out_channels, kernel_size=3, padding=1))
+        self.body = nn.Sequential(*layers)
 
     def forward(self, cond: Tensor) -> Tensor:
         x = self.proj(cond).unsqueeze(-1)
-        return self.body(x)
+        x = self.body(x)
+        if x.shape[-1] != self.upsample:
+            x = torch.nn.functional.interpolate(x, size=self.upsample, mode="linear")
+        return x
 
 
 class QualiaDecoder(nn.Module):

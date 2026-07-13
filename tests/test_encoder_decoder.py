@@ -99,6 +99,10 @@ def test_audio_pipeline_runs() -> None:
     recon = decoder.reconstruct(out)
     assert recon.dim() == 3
     assert recon.shape[0] == 2
+    assert recon.shape[-1] == audio.shape[-1], (
+        f"audio reconstruction length must match input length; "
+        f"got {recon.shape[-1]} vs {audio.shape[-1]}"
+    )
     assert torch.isfinite(recon).all()
 
 
@@ -149,8 +153,11 @@ def _gaussian_mi_lower_bound(x: torch.Tensor, y: torch.Tensor) -> float:
     van den Oord et al. (2018). For each row ``i`` the true positive pair is
     ``(x[i], y[i])``; the negatives are ``y[j] for j != i`` (within-batch
     negatives). MI is bounded below by
-    ``mean_i [ log p(y_i | x_i) / E_pos * (N-1) ]`` which is what this
-    function returns in nats.
+
+        ``I(X; Y) >= log(N) - (1/N) * sum_i CE(logits_i, i)``
+
+    i.e. ``log(N) - cross_entropy_loss``, which is what this function returns
+    in nats.
 
     This is a positive-valued statistic whenever ``y`` is correlated with
     ``x`` across the batch (i.e. carries information); for an independent

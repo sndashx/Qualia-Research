@@ -62,7 +62,7 @@ class EncoderOutput:
         information estimation and the decoder's payload-conditioning path.
         """
         return torch.cat(
-            [self.payload[key].flatten(start_dim=1) for key in PAYLOAD_KEYS],
+            [self.payload[key].flatten(start_dim=1) for key in self.payload],
             dim=-1,
         )
 
