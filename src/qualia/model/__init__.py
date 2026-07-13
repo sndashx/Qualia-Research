@@ -1,11 +1,3 @@
-"""Model modules: Encoder, Decoder, PredictiveLoop, PhenomenalState, GlobalWorkspace, SelfModel.
-
-Public modules:
-  - :class:`qualia.model.phenomenal_state.PhenomenalState`
-  - :class:`qualia.model.encoder.QualiaEncoder` (and backbones / heads)
-  - :class:`qualia.model.decoder.QualiaDecoder`
-"""
-
 from .decoder import PayloadFusion, QualiaDecoder
 from .encoder import (
     PAYLOAD_KEYS,
@@ -17,17 +9,27 @@ from .encoder import (
     TinyViT,
 )
 from .phenomenal_state import PhenomenalState, PhenomenalStateRecord
+from .predictive_loop import (
+    GlobalWorkspace,
+    PredictiveCodingLoop,
+    PredictiveTrajectory,
+    predictive_coding_loss,
+)
 
 __all__ = [
     "EncoderOutput",
+    "GlobalWorkspace",
     "PAYLOAD_KEYS",
     "PayloadFusion",
     "PayloadHead",
     "PhenomenalState",
     "PhenomenalStateRecord",
+    "PredictiveCodingLoop",
+    "PredictiveTrajectory",
     "QualiaDecoder",
     "QualiaEncoder",
     "SensoryHead",
     "TinyConvNeXt",
     "TinyViT",
+    "predictive_coding_loss",
 ]
