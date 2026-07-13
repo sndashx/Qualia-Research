@@ -114,13 +114,10 @@ def _run_pipeline(
         state.encode(sample.percept.unsqueeze(0))
         out = model.forward_from_state(state)
         reports.append(out.report)
-        # Detach the live state so the next sample starts a fresh graph while
-        # preserving the carried-over "previous state" values.
-        state._workspace_live = state.workspace.detach().clone()  # type: ignore[attr-defined]
-        state._self_model_live = state.self_model.detach().clone()  # type: ignore[attr-defined]
-        state._payload_live = {
-            key: tensor.detach().clone() for key, tensor in state.payload().items()
-        }
+        # Break the autograd chain between samples so each sample's report can
+        # be backpropped in isolation by downstream heads without tripping
+        # "Trying to backward through the graph a second time".
+        state.detach_state()
     return reports
 
 
@@ -269,12 +266,15 @@ def report_consistency(
     slot_dim: int = 6,
     attention_schema_dim: int = 8,
 ) -> float:
-    """Cosine similarity of self-reports across two same-seed runs.
+    """Cosine similarity of self-reports across two differently-seeded runs.
 
-    The pipeline is constructed twice with the same seed; both runs encode the
-    full dataset and we measure the mean cosine similarity of the per-sample
-    self-report vectors. A value close to 1.0 means the system produces
-    reproducible reports for reproducible stimuli.
+    The pipeline is constructed twice — the first with ``seed`` and the second
+    with ``seed + 1`` — so each run has an independent random initialization.
+    Both runs then encode the same stimuli in the same order and we measure
+    the mean cosine similarity of the per-sample self-report vectors. A value
+    close to 1.0 means the system produces reproducible reports for
+    reproducible stimuli even when the underlying weights change (i.e. the
+    report tracks the stimulus, not the RNG).
     """
     state_a, model_a = _build_pipeline(
         seed=seed,
@@ -286,7 +286,7 @@ def report_consistency(
         attention_schema_dim=attention_schema_dim,
     )
     state_b, model_b = _build_pipeline(
-        seed=seed,
+        seed=seed + 1,
         percept_dim=dataset.percept_dim,
         workspace_dim=workspace_dim,
         self_model_dim=self_model_dim,

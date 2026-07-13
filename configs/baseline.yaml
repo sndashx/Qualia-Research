@@ -1,5 +1,7 @@
 run_dir: results/baseline
 
+seed: 0
+
 model:
   encoder:
     backbone: convnext_tiny
@@ -20,8 +22,8 @@ train:
   lr: 3.0e-4
 
 eval:
-  report_consistency_threshold: 0.5
-  introspection_accuracy_threshold: 0.0
+  report_consistency_threshold: 0.2
+  introspection_accuracy_threshold: 0.2
   workspace_dim: 8
   self_model_dim: 8
   payload_slots: 4

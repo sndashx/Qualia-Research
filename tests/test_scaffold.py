@@ -20,4 +20,4 @@ def test_hydra_config_loads() -> None:
         assert cfg.model.workspace_dim == 32
         assert cfg.payload_slots == 16
         assert cfg.train.steps == 100
-        assert cfg.eval.report_consistency_threshold == 0.5
+        assert cfg.eval.report_consistency_threshold == 0.2
