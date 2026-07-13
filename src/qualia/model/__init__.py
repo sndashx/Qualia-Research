@@ -15,6 +15,15 @@ from .predictive_loop import (
     PredictiveTrajectory,
     predictive_coding_loss,
 )
+from .self_model import (
+    REPORT_SLOT_NAMES,
+    SelfModel,
+    SelfModelOutput,
+    SelfReport,
+    contrastive_report_loss,
+    contrastive_report_loss_pairwise,
+    report_consistency_loss,
+)
 
 __all__ = [
     "EncoderOutput",
@@ -28,8 +37,15 @@ __all__ = [
     "PredictiveTrajectory",
     "QualiaDecoder",
     "QualiaEncoder",
+    "REPORT_SLOT_NAMES",
     "SensoryHead",
+    "SelfModel",
+    "SelfModelOutput",
+    "SelfReport",
     "TinyConvNeXt",
     "TinyViT",
+    "contrastive_report_loss",
+    "contrastive_report_loss_pairwise",
     "predictive_coding_loss",
+    "report_consistency_loss",
 ]
