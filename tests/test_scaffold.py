@@ -5,7 +5,6 @@ from __future__ import annotations
 from pathlib import Path
 
 from hydra import compose, initialize_config_dir
-
 from qualia import __version__
 
 
