@@ -52,6 +52,7 @@ from qualia.model.synthetic_pipeline import (
     SyntheticDecoder,
     SyntheticEncoder,
 )
+from qualia.tracking import Run
 
 _CONFIG_DIR = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "configs"))
 
@@ -464,68 +465,70 @@ def _write_results_md(
 def main(cfg: DictConfig) -> dict[str, Any]:
     torch.manual_seed(int(cfg.seed))
     tc = _resolve_train_config(cfg)
-    run_dir = str(cfg.run_dir)
-    os.makedirs(run_dir, exist_ok=True)
 
-    resolved = OmegaConf.to_container(cfg, resolve=True)
-    with open(os.path.join(run_dir, "config.yaml"), "w", encoding="utf-8") as fh:
-        json.dump(resolved, fh, indent=2, default=str)
+    with Run(cfg, log_every=int(tc.log_every)) as run:
+        run_dir = run.run_dir
+        os.makedirs(run_dir, exist_ok=True)
 
-    print(f"[qualia.train.train] run_dir = {run_dir}")
-    print(f"[qualia.train.train] config = {OmegaConf.to_yaml(cfg)}")
+        resolved = OmegaConf.to_container(cfg, resolve=True)
+        with open(os.path.join(run_dir, "config.yaml"), "w", encoding="utf-8") as fh:
+            json.dump(resolved, fh, indent=2, default=str)
 
-    train_dataset = ColoredShapesDataset(
-        num_samples=tc.num_train_samples,
-        percept_dim=tc.percept_dim,
-        seed=int(cfg.seed),
-        include_agency=True,
-    )
+        print(f"[qualia.train.train] run_dir = {run_dir}")
+        print(f"[qualia.train.train] config = {OmegaConf.to_yaml(cfg)}")
 
-    encoder, decoder, loop, self_model = _build_pipeline(tc)
-
-    log_path = os.path.join(run_dir, "train_log.jsonl")
-    started = time.perf_counter()
-    history = _train(encoder, decoder, loop, self_model, tc, train_dataset, log_path)
-    train_elapsed = time.perf_counter() - started
-
-    eval_started = time.perf_counter()
-    metrics = _run_eval(tc, seed=int(cfg.seed))
-    eval_elapsed = time.perf_counter() - eval_started
-
-    metrics_path = os.path.join(run_dir, "eval_metrics.json")
-    with open(metrics_path, "w", encoding="utf-8") as fh:
-        json.dump(
-            {"metrics": metrics, "eval_elapsed_s": eval_elapsed},
-            fh,
-            indent=2,
+        train_dataset = ColoredShapesDataset(
+            num_samples=tc.num_train_samples,
+            percept_dim=tc.percept_dim,
+            seed=int(cfg.seed),
+            include_agency=True,
         )
 
-    summary = {
-        "steps": tc.steps,
-        "batch_size": tc.batch_size,
-        "lr": tc.lr,
-        "train_elapsed_s": f"{train_elapsed:.2f}",
-        "eval_elapsed_s": f"{eval_elapsed:.2f}",
-        "final_train_loss": f"{history[-1]['loss']:.4f}" if history else "nan",
-        "introspection_accuracy": f"{metrics['introspection_accuracy']:.4f}",
-        "report_consistency": f"{metrics['report_consistency']:.4f}",
-        "downstream_grounding": f"{metrics['downstream_grounding']:.4f}",
-    }
+        encoder, decoder, loop, self_model = _build_pipeline(tc)
 
-    _write_results_md(history, metrics, summary, os.path.join(run_dir, "RESULTS.md"))
+        log_path = os.path.join(run_dir, "train_log.jsonl")
+        started = time.perf_counter()
+        history = _train(encoder, decoder, loop, self_model, tc, train_dataset, log_path)
+        train_elapsed = time.perf_counter() - started
 
-    print("[qualia.train.train] eval metrics:")
-    for name, value in metrics.items():
-        print(f"  {name:>24s} = {value:.4f}")
-    print(f"[qualia.train.train] wrote {log_path}")
-    print(f"[qualia.train.train] wrote {metrics_path}")
-    print(f"[qualia.train.train] wrote {os.path.join(run_dir, 'RESULTS.md')}")
+        eval_started = time.perf_counter()
+        metrics = _run_eval(tc, seed=int(cfg.seed))
+        eval_elapsed = time.perf_counter() - eval_started
 
-    return {
-        "metrics": metrics,
-        "history": history,
-        "summary": summary,
-    }
+        metrics_path = os.path.join(run_dir, "eval_metrics.json")
+        with open(metrics_path, "w", encoding="utf-8") as fh:
+            json.dump(
+                {"metrics": metrics, "eval_elapsed_s": eval_elapsed},
+                fh,
+                indent=2,
+            )
+
+        summary = {
+            "steps": tc.steps,
+            "batch_size": tc.batch_size,
+            "lr": tc.lr,
+            "train_elapsed_s": f"{train_elapsed:.2f}",
+            "eval_elapsed_s": f"{eval_elapsed:.2f}",
+            "final_train_loss": f"{history[-1]['loss']:.4f}" if history else "nan",
+            "introspection_accuracy": f"{metrics['introspection_accuracy']:.4f}",
+            "report_consistency": f"{metrics['report_consistency']:.4f}",
+            "downstream_grounding": f"{metrics['downstream_grounding']:.4f}",
+        }
+
+        _write_results_md(history, metrics, summary, os.path.join(run_dir, "RESULTS.md"))
+
+        print("[qualia.train.train] eval metrics:")
+        for name, value in metrics.items():
+            print(f"  {name:>24s} = {value:.4f}")
+        print(f"[qualia.train.train] wrote {log_path}")
+        print(f"[qualia.train.train] wrote {metrics_path}")
+        print(f"[qualia.train.train] wrote {os.path.join(run_dir, 'RESULTS.md')}")
+
+        return {
+            "metrics": metrics,
+            "history": history,
+            "summary": summary,
+        }
 
 
 if __name__ == "__main__":
