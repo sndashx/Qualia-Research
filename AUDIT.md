@@ -1,6 +1,6 @@
 # AUDIT — Qualia-Research Codebase
 
-**Repo:** `/workspace/rigs/89887194-dc9b-4aa0-97fc-a073b491cf42/worktrees/gt__toast__7a1fc9f5/`
+**Repo:** `sndashx/Qualia-Research` (branch `main` at audit time)
 **Audit date:** 2026-07-13
 **Auditor:** Toast (polecat)
 **Scope:** Read-only audit. No code modified.
