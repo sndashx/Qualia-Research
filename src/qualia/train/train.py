@@ -6,11 +6,17 @@ that `make train-toy` runs cleanly and Hydra config-loading is verifiable.
 
 from __future__ import annotations
 
+import os
+
 import hydra
 from omegaconf import DictConfig
 
+_CONFIG_DIR = os.path.normpath(
+    os.path.join(os.path.dirname(__file__), "..", "..", "..", "configs")
+)
 
-@hydra.main(version_base=None, config_path="../../../configs", config_name="config")
+
+@hydra.main(version_base=None, config_path=_CONFIG_DIR, config_name="config")
 def main(cfg: DictConfig) -> None:
     print("[qualia.train.train] scaffold placeholder")
     print(f"  workspace_dim={cfg.workspace_dim}")

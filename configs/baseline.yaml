@@ -18,3 +18,7 @@ train:
   steps: 100
   log_every: 10
   lr: 3.0e-4
+
+eval:
+  report_consistency_threshold: 0.5
+  introspection_accuracy_threshold: 0.5

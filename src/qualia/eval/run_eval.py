@@ -6,11 +6,17 @@ that `make eval-toy` runs cleanly.
 
 from __future__ import annotations
 
+import os
+
 import hydra
 from omegaconf import DictConfig
 
+_CONFIG_DIR = os.path.normpath(
+    os.path.join(os.path.dirname(__file__), "..", "..", "..", "configs")
+)
 
-@hydra.main(version_base=None, config_path="../../../configs", config_name="config")
+
+@hydra.main(version_base=None, config_path=_CONFIG_DIR, config_name="config")
 def main(cfg: DictConfig) -> None:
     print("[qualia.eval.run_eval] scaffold placeholder")
     print(f"  eval.report_consistency_threshold={cfg.eval.report_consistency_threshold}")

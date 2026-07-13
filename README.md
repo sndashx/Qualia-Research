@@ -13,7 +13,6 @@ qualia/
 ├── configs/                  Hydra configs (YAML)
 ├── docs/                     Research memo + notes
 ├── results/                  Output: logs, checkpoints, RESULTS.md
-├── scripts/                  Entry-point shell scripts
 ├── src/qualia/
 │   ├── model/                Encoder, Decoder, PredictiveLoop, PhenomenalState,
 │   │                         GlobalWorkspace, SelfModel  (to be implemented)
