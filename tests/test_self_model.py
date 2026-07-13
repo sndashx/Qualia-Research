@@ -172,21 +172,47 @@ def test_contrastive_loss_pulls_positives_and_pushes_negatives() -> None:
     _encode_state(s, seed=4)
     same_report = model.forward_from_state(s).report
 
-    other = _make_state(seed=5)
-    _encode_state(other, seed=6)
-    diff_report = model.forward_from_state(other).report
+    other1 = _make_state(seed=5)
+    _encode_state(other1, seed=6)
+    diff_report_1 = model.forward_from_state(other1).report
+
+    other2 = _make_state(seed=7)
+    _encode_state(other2, seed=8)
+    diff_report_2 = model.forward_from_state(other2).report
+
+    positive_report = model.forward_from_state(s).report
 
     loss_same = contrastive_report_loss(
-        [same_report, same_report],
+        [same_report, positive_report, diff_report_2],
         slot_dim=SLOT_DIM,
         positive_index=0,
     )
     loss_diff = contrastive_report_loss(
-        [same_report, diff_report],
+        [same_report, diff_report_1, diff_report_2],
         slot_dim=SLOT_DIM,
         positive_index=0,
     )
     assert torch.isfinite(loss_same) and torch.isfinite(loss_diff)
+    assert loss_diff.item() > loss_same.item(), (
+        "contrastive loss should be higher when the partner is a distinct "
+        f"state rather than the same state (got loss_diff={loss_diff.item():.4f}, "
+        f"loss_same={loss_same.item():.4f})"
+    )
+
+    v_same = same_report.vector(SLOT_DIM)
+    v_same_partner = positive_report.vector(SLOT_DIM)
+    v_diff_partner = diff_report_1.vector(SLOT_DIM)
+    sim_same = torch.nn.functional.cosine_similarity(
+        v_same.unsqueeze(0), v_same_partner.unsqueeze(0)
+    ).item()
+    sim_diff = torch.nn.functional.cosine_similarity(
+        v_same.unsqueeze(0), v_diff_partner.unsqueeze(0)
+    ).item()
+    assert sim_same > sim_diff, (
+        "cosine similarity between same-state reports should exceed that "
+        f"between distinct-state reports (got sim_same={sim_same:.4f}, "
+        f"sim_diff={sim_diff:.4f})"
+    )
 
 
 def test_pairwise_contrastive_loss_is_finite_and_differentiable() -> None:
@@ -230,5 +256,63 @@ def test_self_report_dataclass_validates_slots() -> None:
     try:
         SelfReport(slots={"arousal": torch.zeros(2)})
     except ValueError:
-        return
-    raise AssertionError("expected ValueError for missing slots")
+        pass
+    else:
+        raise AssertionError("expected ValueError for missing slots")
+
+    extra_slots = dict(slots)
+    extra_slots["rogue"] = torch.zeros(SLOT_DIM)
+    try:
+        SelfReport(slots=extra_slots)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("expected ValueError for extra slots")
+
+
+def test_self_report_vector_validates_slot_dim() -> None:
+    from qualia.model.self_model import SelfReport
+
+    slots = {name: torch.zeros(SLOT_DIM) for name in REPORT_SLOT_NAMES}
+    rep = SelfReport(slots=slots)
+
+    try:
+        rep.vector(SLOT_DIM + 1)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("expected ValueError for mismatched slot_dim")
+
+    try:
+        rep.vector(0)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("expected ValueError for non-positive slot_dim")
+
+
+def test_self_model_output_as_dict_is_serializable() -> None:
+    model = _make_self_model(seed=0)
+    state = _make_state(seed=1)
+    _encode_state(state, seed=2)
+    out = model.forward_from_state(state)
+
+    snap = out.as_dict()
+    assert set(snap["report"].keys()) == set(REPORT_SLOT_NAMES)
+    for name in REPORT_SLOT_NAMES:
+        assert isinstance(snap["report"][name], list)
+        assert all(isinstance(x, float) for x in snap["report"][name])
+    assert isinstance(snap["attention_schema"], list)
+    assert all(isinstance(x, float) for x in snap["attention_schema"])
+    assert isinstance(snap["state_repr"], list)
+    assert all(isinstance(x, float) for x in snap["state_repr"])
+
+
+def test_state_representation_requires_state_dim_with_empty_payload() -> None:
+    model = _make_self_model(seed=0)
+    workspace = torch.randn(WORKSPACE_DIM)
+    self_model_vec = torch.randn(SELF_MODEL_DIM)
+    state_repr = model.state_representation(workspace, self_model_vec, payload={})
+    expected_dim = WORKSPACE_DIM + SELF_MODEL_DIM + len(REPORT_SLOT_NAMES)
+    assert state_repr.shape == (expected_dim,)
+    assert torch.isfinite(state_repr).all()

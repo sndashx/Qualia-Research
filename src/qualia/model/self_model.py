@@ -50,6 +50,9 @@ class SelfReport:
         missing = [name for name in REPORT_SLOT_NAMES if name not in self.slots]
         if missing:
             raise ValueError(f"missing report slots: {missing}")
+        extra = [name for name in self.slots if name not in REPORT_SLOT_NAMES]
+        if extra:
+            raise ValueError(f"unexpected report slots: {extra}")
 
     def __getitem__(self, key: str) -> Tensor:
         return self.slots[key]
@@ -58,7 +61,22 @@ class SelfReport:
         return dict(self.slots)
 
     def vector(self, slot_dim: int) -> Tensor:
-        """Concatenate slots in canonical order into a single vector."""
+        """Concatenate slots in canonical order into a single vector.
+
+        Args:
+            slot_dim: Expected dimensionality of each slot; validated against
+                every slot's trailing dimension to catch mismatches between
+                a report produced by one model and a consumer (loss, snapshot,
+                downstream head) built for a different ``slot_dim``.
+        """
+        if slot_dim <= 0:
+            raise ValueError(f"slot_dim must be positive; got {slot_dim}")
+        for name in REPORT_SLOT_NAMES:
+            slot = self.slots[name]
+            if slot.dim() < 1 or slot.shape[-1] != slot_dim:
+                raise ValueError(
+                    f"slot '{name}' last dim must be {slot_dim}; got {tuple(slot.shape)}"
+                )
         return torch.cat([self.slots[name] for name in REPORT_SLOT_NAMES], dim=-1)
 
     def to_snapshot(self) -> dict[str, list[float]]:
@@ -76,9 +94,9 @@ class SelfModelOutput:
 
     def as_dict(self) -> dict[str, Any]:
         return {
-            "report": self.report.as_dict(),
-            "attention_schema": self.attention_schema,
-            "state_repr": self.state_repr,
+            "report": self.report.to_snapshot(),
+            "attention_schema": self.attention_schema.detach().cpu().tolist(),
+            "state_repr": self.state_repr.detach().cpu().tolist(),
         }
 
 
@@ -147,12 +165,16 @@ class SelfModel(nn.Module):
         self,
         workspace: Tensor,
         self_model_vec: Tensor,
-        payload: dict[str, Tensor] | None = None,
+        payload: dict[str, Tensor],
     ) -> Tensor:
         """Build the input vector consumed by the report heads.
 
-        Always returns a tensor of shape ``(state_dim,)`` — workspace +
-        self-model concatenated with a single summary scalar per payload slot.
+        Returns a tensor of shape ``(state_dim,)`` — workspace + self-model
+        concatenated with a single summary scalar per payload slot.
+
+        ``payload`` must be provided so the returned vector matches the
+        ``state_dim`` the module was constructed with; an empty payload dict
+        yields a zero summary for each named slot.
         """
         if workspace.dim() != 1 or self_model_vec.dim() != 1:
             raise ValueError(
@@ -170,16 +192,16 @@ class SelfModel(nn.Module):
             )
 
         parts: list[Tensor] = [workspace, self_model_vec]
-        if payload is not None:
-            summaries: list[Tensor] = []
-            for name in self.slot_names:
-                if name not in payload:
-                    raise ValueError(f"payload missing slot '{name}'")
-                slot = payload[name]
-                if slot.dim() != 1:
-                    raise ValueError(f"payload slot '{name}' must be 1-D; got {tuple(slot.shape)}")
-                summaries.append(slot.mean().unsqueeze(0))
-            parts.append(torch.cat(summaries, dim=-1))
+        summaries: list[Tensor] = []
+        for name in self.slot_names:
+            slot = payload.get(name)
+            if slot is None:
+                summaries.append(torch.zeros((), dtype=workspace.dtype, device=workspace.device))
+                continue
+            if slot.dim() != 1:
+                raise ValueError(f"payload slot '{name}' must be 1-D; got {tuple(slot.shape)}")
+            summaries.append(slot.mean().unsqueeze(0))
+        parts.append(torch.cat(summaries, dim=-1))
         return torch.cat(parts, dim=-1)
 
     def forward(
@@ -188,6 +210,8 @@ class SelfModel(nn.Module):
         self_model_vec: Tensor,
         payload: dict[str, Tensor] | None = None,
     ) -> SelfModelOutput:
+        if payload is None:
+            payload = {}
         state_repr = self.state_representation(workspace, self_model_vec, payload)
         trunk_out = self.trunk(state_repr)
         slots = OrderedDict((name, self.slot_heads[name](trunk_out)) for name in self.slot_names)
@@ -211,7 +235,7 @@ def report_consistency_loss(
     model: SelfModel,
     prev_workspace: Tensor,
     prev_self_model: Tensor,
-    prev_payload: dict[str, Tensor] | None,
+    prev_payload: dict[str, Tensor],
     curr_report: SelfReport,
 ) -> Tensor:
     """Loss encouraging the current self-report to be predictable from the prior state.
