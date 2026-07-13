@@ -40,7 +40,3 @@ eval:
     num_samples: 32
     percept_dim: 16
     include_agency: true
-
-tracker:
-  name: tensorboard
-  run_subdir: true
