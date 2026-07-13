@@ -195,11 +195,12 @@ class _AudioGenerator(nn.Module):
             layers.append(nn.Conv1d(cur, out_channels, kernel_size=3, padding=1))
         self.body = nn.Sequential(*layers)
 
-    def forward(self, cond: Tensor) -> Tensor:
+    def forward(self, cond: Tensor, target_length: int | None = None) -> Tensor:
         x = self.proj(cond).unsqueeze(-1)
         x = self.body(x)
-        if x.shape[-1] != self.upsample:
-            x = torch.nn.functional.interpolate(x, size=self.upsample, mode="linear")
+        target = self.upsample if target_length is None else int(target_length)
+        if x.shape[-1] != target:
+            x = torch.nn.functional.interpolate(x, size=target, mode="linear")
         return x
 
 
@@ -246,7 +247,7 @@ class QualiaDecoder(nn.Module):
         self.image_size = image_size
         self.payload_keys = tuple(payload_keys)
         self.payload_vocabs = dict(payload_vocabs)
-        self.audio_length = int(audio_length)
+        self.audio_length_default = int(audio_length)
 
         self.fusion = PayloadFusion(
             sensory_dim=sensory_dim,
@@ -278,6 +279,7 @@ class QualiaDecoder(nn.Module):
         payload: dict[str, Tensor] | None = None,
         *,
         use_payload: bool = True,
+        audio_length: int | None = None,
     ) -> Tensor:
         """Reconstruct perception.
 
@@ -288,6 +290,11 @@ class QualiaDecoder(nn.Module):
                 reconstruction, useful as an ablation baseline when measuring
                 whether the payload adds information.
             use_payload: If ``False``, ignore ``payload`` even if provided.
+            audio_length: For audio decoders, the target waveform length. If
+                ``None`` (default), the decoder uses the ``audio_length`` it
+                was constructed with. Threaded through ``forward`` rather
+                than mutating the generator's module state so the module
+                stays thread-safe and per-call.
         """
         if payload is None or not use_payload:
             empty_payload = {
@@ -301,6 +308,8 @@ class QualiaDecoder(nn.Module):
             }
             payload = empty_payload
         cond = self.fusion(sensory, payload)
+        if self.modality == "audio" and isinstance(self.generator, _AudioGenerator):
+            return self.generator(cond, target_length=audio_length)
         return self.generator(cond)
 
     def reconstruct(
@@ -315,19 +324,16 @@ class QualiaDecoder(nn.Module):
         For audio decoders, ``audio_length`` overrides the waveform length
         the generator was built with at construction time. This lets the
         reconstruction track the actual input waveform length instead of
-        the ``audio_length`` captured at construction.
+        the ``audio_length`` captured at construction. The override is
+        threaded through ``forward`` rather than mutating the generator's
+        module state, so calls are thread-safe and the generator's default
+        length is preserved for subsequent calls.
         """
-        if (
-            audio_length is not None
-            and self.modality == "audio"
-            and isinstance(self.generator, _AudioGenerator)
-            and self.generator.upsample != int(audio_length)
-        ):
-            self.generator.upsample = int(audio_length)
         return self.forward(
             encoder_out.sensory,
             encoder_out.payload,
             use_payload=use_payload,
+            audio_length=audio_length,
         )
 
 
