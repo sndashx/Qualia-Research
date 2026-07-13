@@ -103,15 +103,10 @@ class PhenomenalState(nn.Module):
         )
 
         self.register_buffer("_step", torch.zeros((), dtype=torch.long))
-        self._init_live_state()
-
-    def _init_live_state(self) -> None:
-        device = self.payload_projs[next(iter(self.payload_keys))].weight.device
-        self._workspace_live: Tensor = torch.zeros(self.workspace_dim, device=device)
-        self._self_model_live: Tensor = torch.zeros(self.self_model_dim, device=device)
-        self._payload_live: dict[str, Tensor] = {
-            key: torch.zeros(self.payload_slots, device=device) for key in self.payload_keys
-        }
+        self.register_buffer("_workspace_live", torch.zeros(workspace_dim))
+        self.register_buffer("_self_model_live", torch.zeros(self_model_dim))
+        for key in self.payload_keys:
+            self.register_buffer(f"_payload_live_{key}", torch.zeros(payload_slots))
 
     @property
     def workspace(self) -> Tensor:
@@ -122,15 +117,14 @@ class PhenomenalState(nn.Module):
         return self._self_model_live
 
     def payload(self) -> dict[str, Tensor]:
-        return {key: self._payload_live[key] for key in self.payload_keys}
+        return {key: getattr(self, f"_payload_live_{key}") for key in self.payload_keys}
 
     def reset_state(self) -> None:
         """Reset the recurrent state to zero. Safe to call between episodes."""
-        self._workspace_live = torch.zeros_like(self._workspace_live)
-        self._self_model_live = torch.zeros_like(self._self_model_live)
-        self._payload_live = {
-            key: torch.zeros_like(tensor) for key, tensor in self._payload_live.items()
-        }
+        self._workspace_live.zero_()
+        self._self_model_live.zero_()
+        for key in self.payload_keys:
+            getattr(self, f"_payload_live_{key}").zero_()
         self._step.zero_()
 
     def _initial_state(self, batch_size: int, device: torch.device) -> tuple[Tensor, Tensor]:
@@ -170,7 +164,10 @@ class PhenomenalState(nn.Module):
 
         self._workspace_live = ws_summary
         self._self_model_live = sm_summary
-        self._payload_live = {key: self.payload_projs[key](joint) for key in self.payload_keys}
+        for key in self.payload_keys:
+            self.register_buffer(
+                f"_payload_live_{key}", self.payload_projs[key](joint), persistent=True
+            )
         self._step.add_(1)
 
         return {
@@ -184,7 +181,9 @@ class PhenomenalState(nn.Module):
 
     def introspect(self) -> dict[str, Any]:
         """Return a structured dict describing the current phenomenal state."""
-        payload = {key: tensor.detach().clone() for key, tensor in self._payload_live.items()}
+        payload = {
+            key: getattr(self, f"_payload_live_{key}").detach().clone() for key in self.payload_keys
+        }
         return PhenomenalStateRecord(
             workspace=self._workspace_live.detach().cpu().tolist(),
             self_model=self._self_model_live.detach().cpu().tolist(),
