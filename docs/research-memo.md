@@ -92,7 +92,7 @@ Examples: "world models" with explicit latent state (Ha & Schmidhuber), JEPA, sl
 
 ### 3.2 Components
 
-The proposed architecture has five differentiable modules:
+The proposed architecture has six differentiable modules:
 
 | Module | Type | Role |
 |---|---|---|
@@ -253,7 +253,7 @@ This memo is the framing for every bead in the convoy:
 
 | Bead | How this memo informs it |
 |---|---|
-| Scaffold | Layout matches the five modules in §3.2. |
+| Scaffold | Layout matches the six modules in §3.2. |
 | PhenomenalState | Implements §3.3 exactly. |
 | Encoder/Decoder | Implements §3.2 E and D. |
 | PredictiveLoop | Implements §3.2 P; defines precision weighting. |
