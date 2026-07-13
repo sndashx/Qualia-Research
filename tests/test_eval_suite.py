@@ -15,7 +15,6 @@ import math
 import time
 
 import pytest
-
 from qualia.data.synthetic import ColoredShapesDataset
 from qualia.eval.metrics import (
     downstream_grounding,
