@@ -1,0 +1,23 @@
+defaults:
+  - /config
+
+run_dir: results/baseline
+
+model:
+  encoder:
+    backbone: convnext_tiny
+    out_dim: 128
+  decoder:
+    backbone: convnext_tiny
+  workspace_dim: 32
+  payload_slots: 16
+
+data:
+  name: stochastic_colored_shapes
+  batch_size: 16
+  num_workers: 0
+
+train:
+  steps: 100
+  log_every: 10
+  lr: 3.0e-4
