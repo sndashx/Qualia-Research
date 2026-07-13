@@ -67,6 +67,15 @@ GitHub Actions workflow runs `pytest` and `ruff` on every push and PR.
 
 This bead (scaffold) is **complete**. The architecture itself is implemented in downstream beads.
 
+## Experiment tracking
+
+Every `qualia-train` and `qualia-eval` run is wired to a structured tracker.
+TensorBoard is the default (no auth, fully offline); `--no-log` switches to
+an offline JSONL-only sink for CI; `QUALIA_TRACKER=wandb` enables Weights &
+Biases. See [`docs/tracking.md`](docs/tracking.md) for the full reference
+(what gets logged, how to find the dashboards, how to match a checkpoint
+back to a run).
+
 ## License
 
 MIT. See `LICENSE`.

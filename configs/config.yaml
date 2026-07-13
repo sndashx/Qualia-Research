@@ -29,3 +29,7 @@ train:
 eval:
   report_consistency_threshold: 0.5
   introspection_accuracy_threshold: 0.5
+
+tracker:
+  name: tensorboard
+  run_subdir: true
