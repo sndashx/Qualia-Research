@@ -1,0 +1,42 @@
+run_dir: results/baseline
+
+seed: 0
+
+model:
+  encoder:
+    backbone: mlp
+    out_dim: 32
+  decoder:
+    backbone: mlp
+  workspace_dim: 32
+  payload_slots: 16
+
+data:
+  name: stochastic_colored_shapes
+  batch_size: 16
+  num_workers: 0
+  num_train_samples: 64
+
+train:
+  steps: 100
+  log_every: 10
+  lr: 3.0e-4
+  rollout_steps: 4
+  kl_weight: 0.1
+  report_weight: 0.1
+  introspection_weight: 0.1
+
+eval:
+  report_consistency_threshold: 0.2
+  introspection_accuracy_threshold: 0.2
+  workspace_dim: 8
+  self_model_dim: 8
+  payload_slots: 4
+  slot_dim: 6
+  attention_schema_dim: 8
+  epochs: 80
+  lr: 0.1
+  dataset:
+    num_samples: 32
+    percept_dim: 16
+    include_agency: true
