@@ -107,6 +107,9 @@ def _load_checkpoint(
     state: PhenomenalState,
     optimizer: torch.optim.Optimizer,
 ) -> int:
+    # weights_only=False is required for the optimizer state_dict (it uses non-tensor Python
+    # objects internally) and is safe here because this loader only ever consumes checkpoints
+    # written by _save_checkpoint above in this same test. Never point it at untrusted files.
     payload = torch.load(path, map_location="cpu", weights_only=False)
     encoder.load_state_dict(payload["encoder"])
     decoder.load_state_dict(payload["decoder"])
@@ -220,12 +223,13 @@ def test_smoke_checkpoint_round_trip(
     optimizer = torch.optim.AdamW(params, lr=1e-3)
 
     _train_one_step(encoder, decoder, state, optimizer, tiny_batch)
-    _save_checkpoint(tmp_path / "ckpt.pt", encoder, decoder, state, optimizer, step=STEPS)
+    fresh_state_step = int(state._step.item())  # noqa: SLF001 - test inspects internal counter
+    _save_checkpoint(
+        tmp_path / "ckpt.pt", encoder, decoder, state, optimizer, step=fresh_state_step
+    )
 
     fresh_encoder_params = {n: p.detach().clone() for n, p in encoder.named_parameters()}
-    fresh_state_step = int(state._step.item())  # noqa: SLF001 - test inspects internal counter
 
-    torch.load(tmp_path / "ckpt.pt", map_location="cpu", weights_only=False)
     for p in encoder.parameters():
         p.data.zero_()
     for p in decoder.parameters():
@@ -236,7 +240,7 @@ def test_smoke_checkpoint_round_trip(
 
     recovered_step = _load_checkpoint(tmp_path / "ckpt.pt", encoder, decoder, state, optimizer)
 
-    assert recovered_step == STEPS
+    assert recovered_step == fresh_state_step
     assert int(state._step.item()) == fresh_state_step  # noqa: SLF001
     for n, p in encoder.named_parameters():
         assert torch.allclose(p.data, fresh_encoder_params[n]), f"encoder.{n} did not round-trip"
@@ -275,7 +279,7 @@ def test_smoke_eval_runs_and_returns_finite_metrics(
         assert all(math.isfinite(v) for v in value), f"eval payload slot {slot!r} not finite"
 
 
-def test_smoke_train_entrypoint_invokable(tmp_path: Path) -> None:
+def test_smoke_train_entrypoint_invokable() -> None:
     """The `qualia.train.train` entrypoint loads Hydra config and exits cleanly."""
     config_dir = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "configs"))
     with initialize_config_dir(config_dir=config_dir, version_base=None):
@@ -287,7 +291,7 @@ def test_smoke_train_entrypoint_invokable(tmp_path: Path) -> None:
         assert OmegaConf.to_yaml(cfg)  # serializes without error
 
 
-def test_smoke_train_entrypoint_runs(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+def test_smoke_train_entrypoint_runs(capsys: pytest.CaptureFixture[str]) -> None:
     """Invoking `qualia.train.train.main(cfg)` returns without raising and prints status."""
     from qualia.train import train as train_mod
 
