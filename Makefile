@@ -1,7 +1,7 @@
 .PHONY: help setup test train-toy eval-toy lint clean
 
-PYTHON ?= python3
 VENV ?= .venv
+PYTHON := $(VENV)/bin/python
 
 help:
 	@echo "Targets:"
@@ -13,7 +13,7 @@ help:
 	@echo "  clean       Remove caches"
 
 setup:
-	$(PYTHON) -m venv $(VENV)
+	python3 -m venv $(VENV)
 	$(VENV)/bin/pip install --upgrade pip
 	$(VENV)/bin/pip install -e ".[dev]"
 	$(VENV)/bin/pre-commit install
@@ -28,8 +28,8 @@ eval-toy:
 	$(PYTHON) -m qualia.eval.run_eval --config-name=baseline
 
 lint:
-	ruff check src tests
-	black --check src tests
+	$(VENV)/bin/ruff check src tests
+	$(VENV)/bin/black --check src tests
 
 clean:
 	rm -rf .pytest_cache .ruff_cache .mypy_cache .coverage htmlcov build dist
