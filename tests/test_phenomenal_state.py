@@ -99,6 +99,21 @@ def test_modulate_action_requires_correct_dim() -> None:
     raise AssertionError("expected ValueError for wrong-dim action")
 
 
+def test_modulate_action_is_differentiable_through_state() -> None:
+    state = _make_state(seed=2)
+    percepts = torch.randn(BATCH, PERCEPT_DIM)
+    state.encode(percepts)
+    action_dim = WORKSPACE_DIM + SELF_MODEL_DIM
+    action = torch.randn(4, action_dim, requires_grad=True)
+    gated = state.modulate_action(action)
+    loss = gated.pow(2).mean()
+    loss.backward()
+    assert action.grad is not None
+    assert torch.isfinite(action.grad).all()
+    grads = {name: p.grad for name, p in state.named_parameters() if p.grad is not None}
+    assert grads, "expected gradients to flow into PhenomenalState parameters via modulate_action"
+
+
 def test_reset_state_clears_buffers() -> None:
     state = _make_state(seed=5)
     state.encode(torch.randn(BATCH, PERCEPT_DIM))

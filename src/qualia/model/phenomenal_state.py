@@ -12,13 +12,16 @@ The module exposes:
 - reset_state(): clears recurrent state to the initial value (useful for batch boundaries).
 
 Everything is a torch.nn.Module so the state is fully differentiable and trainable
-end-to-end. Determinism w.r.t. seed is achieved by relying only on torch ops with the
+end-to-end. The live state tensors are kept as autograd-tracked tensors so that
+``modulate_action`` participates in the backward graph; ``introspect`` detaches
+its return value so callers receive a plain, JSON-serializable snapshot.
+Determinism w.r.t. seed is achieved by relying only on torch ops with the
 caller-controlled RNG state.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 
 import torch
@@ -98,33 +101,34 @@ class PhenomenalState(nn.Module):
         )
 
         self.register_buffer("_step", torch.zeros((), dtype=torch.long))
-        workspace_init = torch.zeros(workspace_dim)
-        self_model_init = torch.zeros(self_model_dim)
-        payload_init = {
-            key: torch.zeros(payload_slots) for key in self.payload_keys
+        self._init_live_state()
+
+    def _init_live_state(self) -> None:
+        device = self.payload_projs[next(iter(self.payload_keys))].weight.device
+        self._workspace_live: Tensor = torch.zeros(self.workspace_dim, device=device)
+        self._self_model_live: Tensor = torch.zeros(self.self_model_dim, device=device)
+        self._payload_live: dict[str, Tensor] = {
+            key: torch.zeros(self.payload_slots, device=device) for key in self.payload_keys
         }
-        self.register_buffer("_workspace_state", workspace_init.clone())
-        self.register_buffer("_self_model_state", self_model_init.clone())
-        for key, tensor in payload_init.items():
-            self.register_buffer(f"_payload_{key}", tensor.clone())
 
     @property
     def workspace(self) -> Tensor:
-        return self._workspace_state
+        return self._workspace_live
 
     @property
     def self_model(self) -> Tensor:
-        return self._self_model_state
+        return self._self_model_live
 
     def payload(self) -> dict[str, Tensor]:
-        return {key: getattr(self, f"_payload_{key}") for key in self.payload_keys}
+        return {key: self._payload_live[key] for key in self.payload_keys}
 
     def reset_state(self) -> None:
         """Reset the recurrent state to zero. Safe to call between episodes."""
-        self._workspace_state.zero_()
-        self._self_model_state.zero_()
-        for key in self.payload_keys:
-            getattr(self, f"_payload_{key}").zero_()
+        self._workspace_live = torch.zeros_like(self._workspace_live)
+        self._self_model_live = torch.zeros_like(self._self_model_live)
+        self._payload_live = {
+            key: torch.zeros_like(tensor) for key, tensor in self._payload_live.items()
+        }
         self._step.zero_()
 
     def _initial_state(self, batch_size: int, device: torch.device) -> tuple[Tensor, Tensor]:
@@ -158,16 +162,14 @@ class PhenomenalState(nn.Module):
         query = self.self_model_query(h_w)
         h_s = self.self_model_cell(self_model_input + query, h_s)
 
-        with torch.no_grad():
-            self._workspace_state = h_w.detach().mean(dim=0).clone()
-            self._self_model_state = h_s.detach().mean(dim=0).clone()
-            self._step = self._step + 1
-            joint = torch.cat([h_w.detach(), h_s.detach()], dim=-1).mean(dim=0)
-            for key in self.payload_keys:
-                proj = self.payload_projs[key](joint)
-                self.register_buffer(
-                    f"_payload_{key}", proj.clone(), persistent=True
-                )
+        ws_summary = h_w.mean(dim=0)
+        sm_summary = h_s.mean(dim=0)
+        joint = torch.cat([ws_summary, sm_summary], dim=-1)
+
+        self._workspace_live = ws_summary
+        self._self_model_live = sm_summary
+        self._payload_live = {key: self.payload_projs[key](joint) for key in self.payload_keys}
+        self._step.add_(1)
 
         return {
             "workspace": h_w,
@@ -177,10 +179,10 @@ class PhenomenalState(nn.Module):
 
     def introspect(self) -> dict[str, Any]:
         """Return a structured dict describing the current phenomenal state."""
-        payload = {key: getattr(self, f"_payload_{key}").detach().clone() for key in self.payload_keys}
+        payload = {key: tensor.detach().clone() for key, tensor in self._payload_live.items()}
         return PhenomenalStateRecord(
-            workspace=self._workspace_state.detach().cpu().tolist(),
-            self_model=self._self_model_state.detach().cpu().tolist(),
+            workspace=self._workspace_live.detach().cpu().tolist(),
+            self_model=self._self_model_live.detach().cpu().tolist(),
             payload={k: v.cpu().tolist() for k, v in payload.items()},
             step=int(self._step.item()),
         ).to_dict()
@@ -188,8 +190,10 @@ class PhenomenalState(nn.Module):
     def modulate_action(self, action: Tensor) -> Tensor:
         """Gate an action vector by the current phenomenal state.
 
-        The gate is computed from the *current* state buffers so it stays
-        consistent with whatever ``introspect()`` reports.
+        The gate is computed from the *current* live state tensors, so gradients
+        flow from the gate back through the encode computation that produced
+        the state. ``introspect`` will report values consistent with what the
+        gate sees.
         """
         if action.dim() < 1:
             raise ValueError("action must have at least one dimension")
@@ -198,7 +202,7 @@ class PhenomenalState(nn.Module):
                 f"action last dim must be {self.workspace_dim + self.self_model_dim}; "
                 f"got {action.shape[-1]}"
             )
-        state = torch.cat([self._workspace_state, self._self_model_state], dim=-1)
+        state = torch.cat([self._workspace_live, self._self_model_live], dim=-1)
         gate_in = state.unsqueeze(0).expand(action.shape[0], -1)
         gate = self.gate_net(gate_in)
         return action * gate
