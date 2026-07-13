@@ -196,9 +196,7 @@ class SelfModel(nn.Module):
         for name in self.slot_names:
             slot = payload.get(name)
             if slot is None:
-                summaries.append(
-                    torch.zeros(1, dtype=workspace.dtype, device=workspace.device)
-                )
+                summaries.append(torch.zeros(1, dtype=workspace.dtype, device=workspace.device))
                 continue
             if slot.dim() != 1:
                 raise ValueError(f"payload slot '{name}' must be 1-D; got {tuple(slot.shape)}")
