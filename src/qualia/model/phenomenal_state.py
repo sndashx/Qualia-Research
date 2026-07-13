@@ -133,6 +133,26 @@ class PhenomenalState(nn.Module):
         }
         self._step.zero_()
 
+    def detach_state(self) -> None:
+        """Detach the live state tensors in place.
+
+        Replaces ``_workspace_live``, ``_self_model_live`` and the payload
+        tensors with detached clones of their current values. This breaks the
+        autograd chain from the previous ``encode`` call so the next ``encode``
+        starts a fresh computation graph — useful for post-hoc evaluation
+        across many independent stimuli where each sample must be backprop-able
+        in isolation.
+
+        This is the supported public API for "freeze the carried-over state
+        between samples". Direct manipulation of the ``_live`` attributes is a
+        private implementation detail.
+        """
+        self._workspace_live = self._workspace_live.detach().clone()
+        self._self_model_live = self._self_model_live.detach().clone()
+        self._payload_live = {
+            key: tensor.detach().clone() for key, tensor in self._payload_live.items()
+        }
+
     def _initial_state(self, batch_size: int, device: torch.device) -> tuple[Tensor, Tensor]:
         ws = torch.zeros(batch_size, self.workspace_dim, device=device)
         sm = torch.zeros(batch_size, self.self_model_dim, device=device)
