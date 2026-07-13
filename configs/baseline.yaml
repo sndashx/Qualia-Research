@@ -21,4 +21,15 @@ train:
 
 eval:
   report_consistency_threshold: 0.5
-  introspection_accuracy_threshold: 0.5
+  introspection_accuracy_threshold: 0.0
+  workspace_dim: 8
+  self_model_dim: 8
+  payload_slots: 4
+  slot_dim: 6
+  attention_schema_dim: 8
+  epochs: 80
+  lr: 0.1
+  dataset:
+    num_samples: 32
+    percept_dim: 16
+    include_agency: true

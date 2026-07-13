@@ -1,1 +1,8 @@
-"""Datasets and synthetic generators (to be implemented)."""
+from .synthetic import COLOR_NAMES, SHAPE_NAMES, ColoredShapeSample, ColoredShapesDataset
+
+__all__ = [
+    "COLOR_NAMES",
+    "ColoredShapeSample",
+    "ColoredShapesDataset",
+    "SHAPE_NAMES",
+]
