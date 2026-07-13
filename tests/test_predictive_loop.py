@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import torch
-
 from qualia.model.predictive_loop import (
     GlobalWorkspace,
     PredictiveCodingLoop,
