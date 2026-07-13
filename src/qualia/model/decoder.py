@@ -166,10 +166,11 @@ class _AudioGenerator(nn.Module):
     """1D transposed-conv decoder for the audio modality.
 
     The decoder is built to upsample from a single sample up to ``upsample``
-    samples by stacking ``ConvTranspose1d`` blocks (stride 4, 8, 16, ...) until
-    the target length is reached. ``forward`` then interpolates to the exact
-    target length so the reconstruction matches the input waveform's temporal
-    length.
+    samples by stacking ``ConvTranspose1d`` blocks (fixed stride 4; each layer
+    multiplies length by ~4) until the target length is covered.
+    ``forward`` then runs a final ``F.interpolate(..., mode='linear')`` to land
+    exactly on ``upsample`` samples so the reconstruction matches the input
+    waveform's temporal length.
     """
 
     def __init__(self, cond_dim: int, out_channels: int = 1, upsample: int = 1024) -> None:
@@ -225,6 +226,7 @@ class QualiaDecoder(nn.Module):
         payload_keys: tuple[str, ...] = PAYLOAD_KEYS,
         payload_vocabs: dict[str, int] | None = None,
         hidden_dim: int = 64,
+        audio_length: int = 1024,
     ) -> None:
         super().__init__()
         if encoder is not None:
@@ -244,6 +246,7 @@ class QualiaDecoder(nn.Module):
         self.image_size = image_size
         self.payload_keys = tuple(payload_keys)
         self.payload_vocabs = dict(payload_vocabs)
+        self.audio_length = int(audio_length)
 
         self.fusion = PayloadFusion(
             sensory_dim=sensory_dim,
@@ -263,7 +266,9 @@ class QualiaDecoder(nn.Module):
             else:
                 raise ValueError(f"backbone must be 'cnn' or 'vit'; got {backbone!r}")
         elif modality == "audio":
-            self.generator = _AudioGenerator(cond_dim, out_channels=in_channels)
+            self.generator = _AudioGenerator(
+                cond_dim, out_channels=in_channels, upsample=audio_length
+            )
         else:
             raise ValueError(f"modality must be 'image' or 'audio'; got {modality!r}")
 
@@ -303,8 +308,22 @@ class QualiaDecoder(nn.Module):
         encoder_out: EncoderOutput,
         *,
         use_payload: bool = True,
+        audio_length: int | None = None,
     ) -> Tensor:
-        """Convenience: decode directly from an :class:`EncoderOutput`."""
+        """Convenience: decode directly from an :class:`EncoderOutput`.
+
+        For audio decoders, ``audio_length`` overrides the waveform length
+        the generator was built with at construction time. This lets the
+        reconstruction track the actual input waveform length instead of
+        the ``audio_length`` captured at construction.
+        """
+        if (
+            audio_length is not None
+            and self.modality == "audio"
+            and isinstance(self.generator, _AudioGenerator)
+            and self.generator.upsample != int(audio_length)
+        ):
+            self.generator.upsample = int(audio_length)
         return self.forward(
             encoder_out.sensory,
             encoder_out.payload,

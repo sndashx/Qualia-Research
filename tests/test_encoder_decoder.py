@@ -93,10 +93,16 @@ def test_audio_pipeline_runs() -> None:
         payload_keys=PAYLOAD_KEYS,
         payload_vocabs={"shape": 4, "color": 4},
     )
+    # Intentionally do NOT pass audio_length here so the decoder falls back
+    # to its default (1024). The test then overrides it at reconstruct() time
+    # to prove the wiring tracks the real input length, not the constructor
+    # default.
     decoder = QualiaDecoder(encoder=encoder)
-    audio = torch.randn(2, 1, 1024)
+    # Pick a length different from the default 1024 to exercise the override.
+    audio_length = 640
+    audio = torch.randn(2, 1, audio_length)
     out = encoder(audio)
-    recon = decoder.reconstruct(out)
+    recon = decoder.reconstruct(out, audio_length=audio_length)
     assert recon.dim() == 3
     assert recon.shape[0] == 2
     assert recon.shape[-1] == audio.shape[-1], (
