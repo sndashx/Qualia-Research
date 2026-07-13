@@ -11,9 +11,7 @@ import os
 import hydra
 from omegaconf import DictConfig
 
-_CONFIG_DIR = os.path.normpath(
-    os.path.join(os.path.dirname(__file__), "..", "..", "..", "configs")
-)
+_CONFIG_DIR = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "configs"))
 
 
 @hydra.main(version_base=None, config_path=_CONFIG_DIR, config_name="config")
