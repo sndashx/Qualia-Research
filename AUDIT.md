@@ -18,7 +18,7 @@ As a result, this audit cannot report on a "training pipeline" in the operationa
 ## A) Directory structure
 
 ```
-gt__toast__7a1fc9f5/
+sndashx/Qualia-Research/
 ├── .github/workflows/ci.yml            — CI: ruff + black --check + pytest on push/PR, Python 3.10/3.11
 ├── .gitignore                          — ignores __pycache__, *.pt, results/*/checkpoints, .venv, etc.
 ├── .pre-commit-config.yaml             — ruff (with --fix) + ruff-format + black
