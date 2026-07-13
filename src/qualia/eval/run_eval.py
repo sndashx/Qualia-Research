@@ -26,6 +26,7 @@ from omegaconf import DictConfig, OmegaConf
 
 from qualia.data.synthetic import ColoredShapesDataset
 from qualia.eval.metrics import run_eval_suite
+from qualia.tracking import Run
 
 _CONFIG_DIR = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "configs"))
 
@@ -90,31 +91,34 @@ def main(cfg: DictConfig) -> dict[str, Any]:
     print("[qualia.eval.run_eval] starting introspection & reportability suite")
     print(OmegaConf.to_yaml(cfg.eval))
 
-    dataset = _build_dataset(cfg)
-    print(
-        f"[qualia.eval.run_eval] dataset: ColoredShapesDataset "
-        f"(n={len(dataset)}, percept_dim={dataset.percept_dim}, seed={dataset.seed})"
-    )
+    with Run(cfg) as run:
+        run_dir = run.run_dir
 
-    started = time.perf_counter()
-    bundle = run_eval_suite(dataset, **_suite_kwargs(cfg))
-    elapsed_s = time.perf_counter() - started
+        dataset = _build_dataset(cfg)
+        print(
+            f"[qualia.eval.run_eval] dataset: ColoredShapesDataset "
+            f"(n={len(dataset)}, percept_dim={dataset.percept_dim}, seed={dataset.seed})"
+        )
 
-    metrics = bundle.as_dict()
-    _print_summary(metrics, elapsed_s)
+        started = time.perf_counter()
+        bundle = run_eval_suite(dataset, **_suite_kwargs(cfg))
+        elapsed_s = time.perf_counter() - started
 
-    failures = _check_thresholds(metrics, cfg)
-    if failures:
-        for failure in failures:
-            print(f"[qualia.eval.run_eval] FAIL: {failure}")
-        raise SystemExit(1)
+        metrics = bundle.as_dict()
+        _print_summary(metrics, elapsed_s)
 
-    summary_path = os.path.join(os.getcwd(), "eval_metrics.json")
-    with open(summary_path, "w", encoding="utf-8") as fh:
-        json.dump({"metrics": metrics, "elapsed_s": elapsed_s}, fh, indent=2)
-    print(f"[qualia.eval.run_eval] wrote {summary_path}")
+        failures = _check_thresholds(metrics, cfg)
+        if failures:
+            for failure in failures:
+                print(f"[qualia.eval.run_eval] FAIL: {failure}")
+            raise SystemExit(1)
 
-    return {"metrics": metrics, "elapsed_s": elapsed_s}
+        summary_path = os.path.join(run_dir, "eval_metrics.json")
+        with open(summary_path, "w", encoding="utf-8") as fh:
+            json.dump({"metrics": metrics, "elapsed_s": elapsed_s}, fh, indent=2)
+        print(f"[qualia.eval.run_eval] wrote {summary_path}")
+
+        return {"metrics": metrics, "elapsed_s": elapsed_s}
 
 
 if __name__ == "__main__":
