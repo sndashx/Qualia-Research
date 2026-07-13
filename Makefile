@@ -1,4 +1,4 @@
-.PHONY: help setup test train-toy eval-toy lint clean
+.PHONY: help setup test smoke train-toy eval-toy lint clean
 
 VENV ?= .venv
 PYTHON := $(VENV)/bin/python
@@ -6,7 +6,8 @@ PYTHON := $(VENV)/bin/python
 help:
 	@echo "Targets:"
 	@echo "  setup       Create venv, install package + dev deps, install pre-commit hooks"
-	@echo "  test        Run pytest"
+	@echo "  test        Run full pytest suite (includes smoke)"
+	@echo "  smoke       Run smoke tests only (~60 s CPU, for fast polecat feedback)"
 	@echo "  train-toy   Run toy training (placeholder until training is wired)"
 	@echo "  eval-toy    Run toy eval (placeholder until eval is wired)"
 	@echo "  lint        ruff + black --check"
@@ -20,6 +21,9 @@ setup:
 
 test:
 	$(PYTHON) -m pytest
+
+smoke:
+	$(PYTHON) -m pytest -m smoke
 
 train-toy:
 	$(PYTHON) -m qualia.train.train --config-name=baseline
