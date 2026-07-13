@@ -1,6 +1,7 @@
 # @package _global_
 
 defaults:
+  - _self_
   - baseline
 
 workspace_dim: 32
@@ -15,11 +16,6 @@ model:
     backbone: convnext_tiny
   workspace_dim: ${workspace_dim}
   payload_slots: ${payload_slots}
-
-data:
-  name: stochastic_colored_shapes
-  batch_size: 16
-  num_workers: 0
 
 train:
   steps: 100

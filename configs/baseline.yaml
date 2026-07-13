@@ -11,8 +11,13 @@ model:
 
 data:
   name: stochastic_colored_shapes
+  n_samples: 256
+  image_size: 32
   batch_size: 16
   num_workers: 0
+  shuffle: true
+  rebuild_cache: false
+  preprocessing: {}
 
 train:
   steps: 100
@@ -26,4 +31,3 @@ eval:
 tracker:
   name: tensorboard
   run_subdir: true
-

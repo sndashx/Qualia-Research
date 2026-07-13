@@ -18,3 +18,5 @@ results/*/checkpoints/
 results/*/logs/
 *.pt
 *.pth
+.cache/
+outputs/
