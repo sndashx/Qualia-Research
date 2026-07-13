@@ -134,7 +134,8 @@ multiple polecats. Explicit ids supplied via `cfg.tracker.run_id` or
 ```
 "my run!"   -> "my-run-"
 "a"*500    -> "a"*128  (truncated)
-"###"      -> (auto-generated, since sanitization leaves nothing useful)
+"###"      -> "---"     (sanitized, kept)
+""         -> (auto-generated, since sanitization leaves nothing useful)
 ```
 
 The `metadata.json` written next to every run captures the git SHA, branch,

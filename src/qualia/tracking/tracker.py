@@ -7,7 +7,8 @@ Three concrete implementations are provided:
   ``tensorboard --logdir=...``. Zero auth, no network, offline-friendly.
 - ``WandbTracker`` (opt-in, ``tracker=wandb``): streams to Weights & Biases
   when ``wandb`` is installed and ``WANDB_API_KEY`` (or ``wandb login``) is set.
-  Falls back gracefully to the local JSONL tracker when wandb is unavailable.
+  Falls back gracefully to TensorBoard (which also writes the JSONL sink) when
+  wandb is unavailable.
 - ``JsonlTracker`` (always-on local sink): appends every metric dict to a
   newline-delimited JSON file under ``results/<run>/logs/metrics.jsonl``. This
   is the offline/CI fallback and is **always** written even when an external
