@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import torch
-
 from qualia.model.phenomenal_state import PAYLOAD_KEYS, PhenomenalState
 
 PERCEPT_DIM = 16

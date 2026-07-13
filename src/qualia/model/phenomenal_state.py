@@ -44,7 +44,7 @@ class PhenomenalStateRecord:
             "workspace": list(self.workspace),
             "self_model": list(self.self_model),
             "payload": {
-                k: list(v) if isinstance(v, (list, tuple)) else float(v)
+                k: list(v) if isinstance(v, list | tuple) else float(v)
                 for k, v in self.payload.items()
             },
             "step": int(self.step),
