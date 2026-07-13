@@ -50,10 +50,18 @@ class PayloadFusion(nn.Module):
             self.payload_vocabs.setdefault(key, 1)
 
         self.embeddings = nn.ModuleDict(
-            {key: nn.Linear(vocab, hidden_dim) for key, vocab in self.payload_vocabs.items() if vocab > 1}
+            {
+                key: nn.Linear(vocab, hidden_dim)
+                for key, vocab in self.payload_vocabs.items()
+                if vocab > 1
+            }
         )
         self.cont_embeds = nn.ModuleDict(
-            {key: nn.Linear(1, hidden_dim) for key, vocab in self.payload_vocabs.items() if vocab == 1}
+            {
+                key: nn.Linear(1, hidden_dim)
+                for key, vocab in self.payload_vocabs.items()
+                if vocab == 1
+            }
         )
         self.fuse = nn.Sequential(
             nn.Linear(sensory_dim + len(self.payload_keys) * hidden_dim, hidden_dim),
@@ -176,9 +184,7 @@ class _AudioGenerator(nn.Module):
         target = max(self.upsample, 1)
         while target > 1:
             next_cur = max(cur // 2, out_channels)
-            layers.append(
-                nn.ConvTranspose1d(cur, next_cur, kernel_size=8, stride=4, padding=2)
-            )
+            layers.append(nn.ConvTranspose1d(cur, next_cur, kernel_size=8, stride=4, padding=2))
             cur = next_cur
             target = (target + 3) // 4  # ceil(target / 4)
             if cur == out_channels:
