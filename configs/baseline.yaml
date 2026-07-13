@@ -4,10 +4,10 @@ seed: 0
 
 model:
   encoder:
-    backbone: convnext_tiny
-    out_dim: 128
+    backbone: mlp
+    out_dim: 32
   decoder:
-    backbone: convnext_tiny
+    backbone: mlp
   workspace_dim: 32
   payload_slots: 16
 
@@ -15,11 +15,16 @@ data:
   name: stochastic_colored_shapes
   batch_size: 16
   num_workers: 0
+  num_train_samples: 64
 
 train:
   steps: 100
   log_every: 10
   lr: 3.0e-4
+  rollout_steps: 4
+  kl_weight: 0.1
+  report_weight: 0.1
+  introspection_weight: 0.1
 
 eval:
   report_consistency_threshold: 0.2
