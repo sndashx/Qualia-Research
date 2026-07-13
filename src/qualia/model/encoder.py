@@ -204,9 +204,7 @@ class PayloadHead(nn.Module):
         # Validate: all keys must have an entry (defaulting vocab=1 = continuous).
         for key in self.keys:
             self.vocabs.setdefault(key, 1)
-        self.projs = nn.ModuleDict(
-            {key: nn.Linear(in_dim, self.vocabs[key]) for key in self.keys}
-        )
+        self.projs = nn.ModuleDict({key: nn.Linear(in_dim, self.vocabs[key]) for key in self.keys})
 
     def forward(self, feature: Tensor) -> dict[str, Tensor]:
         return {key: self.projs[key](feature) for key in self.keys}
@@ -290,20 +288,18 @@ class QualiaEncoder(nn.Module):
 
         feature_dim = int(getattr(self.backbone, "out_dim", 64))
         self.sensory_head = SensoryHead(feature_dim, sensory_dim=sensory_dim)
-        self.payload_head = PayloadHead(feature_dim, keys=self.payload_keys, vocabs=self.payload_vocabs)
+        self.payload_head = PayloadHead(
+            feature_dim, keys=self.payload_keys, vocabs=self.payload_vocabs
+        )
 
     def forward(self, x: Tensor) -> EncoderOutput:
         if self.modality == "audio":
             if x.dim() != 3:
-                raise ValueError(
-                    f"audio input must have shape (B, C, T); got {tuple(x.shape)}"
-                )
+                raise ValueError(f"audio input must have shape (B, C, T); got {tuple(x.shape)}")
             feature = self.backbone(x).flatten(1)
         else:
             if x.dim() != 4:
-                raise ValueError(
-                    f"image input must have shape (B, C, H, W); got {tuple(x.shape)}"
-                )
+                raise ValueError(f"image input must have shape (B, C, H, W); got {tuple(x.shape)}")
             feature = self.backbone(x)
 
         sensory = self.sensory_head(feature)

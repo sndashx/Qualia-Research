@@ -50,10 +50,7 @@ class PayloadFusion(nn.Module):
             self.payload_vocabs.setdefault(key, 1)
 
         self.embeddings = nn.ModuleDict(
-            {
-                key: nn.Linear(vocab, hidden_dim)
-                for key, vocab in self.payload_vocabs.items()
-            }
+            {key: nn.Linear(vocab, hidden_dim) for key, vocab in self.payload_vocabs.items()}
         )
         self.cont_embeds = nn.ModuleDict(
             {key: nn.Linear(1, hidden_dim) for key in self.payload_keys}
